@@ -4,20 +4,8 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/:match*",
-      "destination": "/api/:match*"
-    },
-    {
       "source": "/analyze",
-      "destination": "/frontend/analyze.html"
-    },
-    {
-      "source": "/",
-      "destination": "/frontend/index.html"
-    },
-    {
-      "source": "/:match*",
-      "destination": "/frontend/:match*"
+      "destination": "/analyze.html"
     }
   ],
   "headers": [
@@ -27,6 +15,18 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS,PUT,DELETE" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization, X-AI-Api-Key" }
+      ]
+    },
+    {
+      "source": "/css/(.*)",
+      "headers": [
+        { "key": "Content-Type", "value": "text/css; charset=UTF-8" }
+      ]
+    },
+    {
+      "source": "/js/(.*)",
+      "headers": [
+        { "key": "Content-Type", "value": "application/javascript; charset=UTF-8" }
       ]
     },
     {

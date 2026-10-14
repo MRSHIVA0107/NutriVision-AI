@@ -45,20 +45,18 @@ nutrivision-ai/
 │   └── nutrition/
 │       ├── search.js             # GET  /api/nutrition/search (USDA search + fallback)
 │       └── calculate.js          # POST /api/nutrition/calculate (macro & daily value math)
-├── frontend/                     # Static Web Application
-│   ├── index.html                # Responsive homepage with nutrition theme
-│   ├── analyze.html              # Meal analysis workspace (camera, upload & dashboard)
-│   ├── css/
-│   │   ├── style.css             # Theme design system, layout, navigation & typography
-│   │   └── dashboard.css         # Workspace panels, Chart.js cards, FDA facts label
-│   ├── js/
-│   │   ├── config.js             # API_BASE_URL auto-detector (Vercel, origin, or custom)
-│   │   ├── camera.js             # Webcam stream, snapshots, and permissions handler
-│   │   ├── nutrition.js          # REST API client & calculation engine
-│   │   ├── dashboard.js          # Chart.js visualizer (Doughnut & Bar) & meal diary
-│   │   └── app.js                # Master coordinator for events, drag-and-drop & UI
-│   └── assets/                   # Icons and graphic assets
-├── vercel.json                   # Vercel deployment config, rewrites & security headers
+├── css/                          # Theme styles & workspace dashboard CSS
+│   ├── style.css
+│   └── dashboard.css
+├── js/                           # Client controllers & config
+│   ├── app.js
+│   ├── camera.js
+│   ├── config.js
+│   ├── dashboard.js
+│   └── nutrition.js
+├── index.html                    # Responsive homepage
+├── analyze.html                  # Meal analysis workspace
+├── vercel.json                   # Vercel deployment config & security headers
 ├── .vercelignore                 # Excludes logs and IDE files from Vercel deployments
 ├── package.json                  # Scripts (npm start, npm run dev) and metadata
 ├── server.js                     # Standalone Node.js server (local testing / dev)

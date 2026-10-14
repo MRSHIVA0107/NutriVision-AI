@@ -5,8 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js",
-    "build": "echo 'Vercel build: ready'"
+    "dev": "node server.js"
   },
   "keywords": [
     "nutrition",
