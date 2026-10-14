@@ -4,7 +4,7 @@ const path = require('path');
 const url = require('url');
 
 const PORT = process.env.PORT || 8888;
-const PUBLIC_DIR = __dirname;
+const PUBLIC_DIR = path.join(__dirname, '..');
 
 // Reference fallback database for instant local lookups without USDA network delays
 const REFERENCE_FOODS = [
