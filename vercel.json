@@ -2,11 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "cleanUrls": true,
-  "functions": {
-    "server.js": {
-      "includeFiles": "assets-bundle.js"
-    }
-  },
   "headers": [
     {
       "source": "/api/(.*)",
@@ -35,14 +30,6 @@
     {
       "source": "/analyze",
       "destination": "/analyze.html"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/server.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/server.js"
     }
   ]
 }

@@ -1,5 +1,5 @@
 // Auto-generated in-memory asset bundle for Vercel Serverless Function runtime
-// Generated at: 2026-10-14T15:32:41.252Z
+// Generated at: 2026-10-14T15:54:40.873Z
 const BUNDLE = {
   "/": {
     contentType: "text/html; charset=UTF-8",

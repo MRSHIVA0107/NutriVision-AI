@@ -2,7 +2,6 @@
   "name": "nutrivision-ai",
   "version": "1.0.0",
   "description": "Intelligent Food Recognition & Precision Nutrition Analysis Platform",
-  "main": "server.js",
   "scripts": {
     "build": "node scripts/build-bundle.js",
     "start": "node server.js",
