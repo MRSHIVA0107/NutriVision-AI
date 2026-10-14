@@ -1,0 +1,10 @@
+# Vercel Deployment Exclusions
+backend/
+target/
+*.log
+.git
+.github
+.idea
+.vscode
+*.iml
+.mvn

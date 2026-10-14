@@ -1,0 +1,23 @@
+{
+  "name": "nutrivision-ai",
+  "version": "1.0.0",
+  "description": "Intelligent Food Recognition & Precision Nutrition Analysis Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'Vercel build: ready'"
+  },
+  "keywords": [
+    "nutrition",
+    "food-recognition",
+    "gemini-vision",
+    "usda-fooddata",
+    "computer-vision",
+    "vercel"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}
