@@ -1,8 +1,8 @@
 /**
  * NutriVision AI - Frontend Configuration
  *
- * NOTE: Set API_BASE_URL to your deployed Spring Boot backend domain.
- * Example: https://nutrivision-api.onrender.com or https://api.yourdomain.com
+ * NOTE: API_BASE_URL auto-resolves to window.location.origin on Vercel and local dev.
+ * You can also set DEFAULT_API_BASE_URL if pointing to an external backend.
  * Never put private API keys here — all private keys belong in backend environment variables.
  */
 

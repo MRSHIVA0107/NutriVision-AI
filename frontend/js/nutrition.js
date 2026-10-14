@@ -1,6 +1,6 @@
 /**
  * NutriVision AI - Nutrition API & Calculation Engine (js/nutrition.js)
- * Handles communication with Spring Boot backend endpoints and executes nutrient scaling formulas.
+ * Handles communication with backend REST endpoints (Vercel Serverless / Node.js) and executes nutrient scaling formulas.
  */
 
 class NutriNutrition {

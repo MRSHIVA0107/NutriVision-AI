@@ -375,10 +375,10 @@
             </div>
 
             <div class="arch-box">
-              <span class="arch-box-role">Backend Tier</span>
-              <h4 class="arch-box-title">Spring Boot REST API</h4>
+              <span class="arch-box-role">Compute Tier</span>
+              <h4 class="arch-box-title">Vercel Serverless Functions</h4>
               <p class="arch-box-desc">
-                Java 21 Spring Boot microservice handling image uploads, CORS policies, DTO validation, and error handling.
+                Fast Node.js serverless endpoints handling image uploads, CORS policies, USDA queries, and nutrient calculations.
               </p>
             </div>
 
@@ -459,7 +459,7 @@
           <ul>
             <li><a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData Central</a></li>
             <li><a href="https://www.chartjs.org/" target="_blank" rel="noopener">Chart.js Visualization</a></li>
-            <li><a href="https://spring.io/projects/spring-boot" target="_blank" rel="noopener">Spring Boot 3</a></li>
+            <li><a href="https://nodejs.org/" target="_blank" rel="noopener">Node.js Serverless</a></li>
             <li><a href="https://vercel.com/" target="_blank" rel="noopener">Vercel Platform</a></li>
           </ul>
         </div>
@@ -493,13 +493,13 @@
       </div>
       <div class="modal-body">
         <p class="form-help">
-          The frontend communicates with your Java Spring Boot REST API for food recognition and USDA calculations. In production, configure this with your deployed HTTPS API URL.
+          NutriVision AI runs on Vercel Serverless Functions out of the box. You can also specify an external HTTPS backend URL below if desired.
         </p>
 
         <div class="form-group">
           <label class="form-label" for="backendUrlInput">API Base URL</label>
           <input type="url" id="backendUrlInput" class="form-input" placeholder="http://localhost:8888">
-          <span class="form-help">Current active origin: <code>http://localhost:8888</code> (or deployed HTTPS URL in production).</span>
+          <span class="form-help">Current active origin: <code>http://localhost:8888</code> (or Vercel domain in production).</span>
         </div>
 
         <div class="form-group">

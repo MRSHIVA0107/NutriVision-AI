@@ -1,7 +1,7 @@
 # NutriVision AI 🥗
 
 > **Intelligent Food Recognition & Precision Nutrition Analysis Platform**
-> Fully **Vercel Ready** with fullstack Serverless Node.js API functions and static edge frontend. Also supports standalone Node.js and Java 21 Spring Boot.
+> Fully **Vercel Ready** with fullstack Serverless Node.js API functions and static edge frontend. Also supports local development with standalone Node.js.
 
 ---
 
@@ -59,14 +59,9 @@ nutrivision-ai/
 │   │   └── app.js                # Master coordinator for events, drag-and-drop & UI
 │   └── assets/                   # Icons and graphic assets
 ├── vercel.json                   # Vercel deployment config, rewrites & security headers
-├── .vercelignore                 # Excludes Java files/target/logs from Vercel deployments
+├── .vercelignore                 # Excludes logs and IDE files from Vercel deployments
 ├── package.json                  # Scripts (npm start, npm run dev) and metadata
 ├── server.js                     # Standalone Node.js server (local testing / dev)
-├── backend/                      # Optional Java 21 Spring Boot REST API
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── src/
-├── netlify.toml                  # Optional Netlify fallback config
 ├── .gitignore                    # Git exclusions
 └── README.md                     # Documentation
 ```
