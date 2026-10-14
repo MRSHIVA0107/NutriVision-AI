@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meal Analysis &amp; Nutrition Engine — NutriVision AI</title>
+  <meta name="description" content="Upload or snap a food photo to detect meals with AI and calculate accurate nutritional values via USDA FoodData Central.">
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Core Theme & Dashboard Stylesheets -->
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/dashboard.css">
+
+  <!-- Chart.js CDN for interactive nutrition charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       Header & Navigation
+       ========================================================================== -->
+  <header class="site-header">
+    <div class="container navbar">
+      <a href="index.html" class="brand-logo" aria-label="NutriVision AI Home">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
+            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
+          </svg>
+        </div>
+        <span>NutriVision<span class="brand-ai-badge">AI</span></span>
+      </a>
+
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="analyze.html" class="active">Analyze Meal</a></li>
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#how-it-works">How It Works</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <!-- Live backend health status indicator -->
+        <button type="button" class="backend-status-pill" id="backendStatusPill" title="Click to view backend configuration">
+          <span class="status-dot warning" id="statusDot"></span>
+          <span id="statusText">Checking Backend...</span>
+        </button>
+
+        <a href="index.html" class="btn-outline" style="padding: 0.5rem 1.15rem; font-size: 0.88rem;">
+          Back to Home
+        </a>
+
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+          ☰
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace-section">
+    <div class="container">
+      <div class="workspace-header">
+        <h1 class="workspace-title">Meal Analysis &amp; Nutrition Engine</h1>
+        <p class="workspace-subtitle">
+          Upload an image or use your camera to identify foods with AI, or search USDA FoodData Central directly.
+        </p>
+      </div>
+
+      <!-- AI Status / Key Missing Notice Banner -->
+      <div id="aiStatusNotice" class="missing-data-box" style="display: none; margin-bottom: 1.5rem; background: #ecfdf5; border-color: #a7f3d0; color: #065f46;">
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+          <span style="font-size: 1.25rem;">ℹ️</span>
+          <div>
+            <strong>AI Recognition Notice:</strong>
+            <p id="aiNoticeMessage" style="margin-top: 0.25rem; font-size: 0.88rem;"></p>
+            <p style="margin-top: 0.35rem; font-size: 0.8rem; color: var(--text-secondary);">
+              Tip: You can use the USDA Search bar on the right to look up and calculate nutrients for any food item right now.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           Two-Column Input & Detection Workspace
+           ========================================================================== -->
+      <div class="analysis-layout">
+
+        <!-- Column 1: Food Image Capture & Upload -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span>1. Capture or Upload Meal</span>
+            </h2>
+            <span class="format-tag">JPG, PNG, WebP</span>
+          </div>
+
+          <!-- Input Method Tabs -->
+          <div class="input-tabs">
+            <button type="button" class="tab-btn active" id="tabUpload">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              <span>Upload Image</span>
+            </button>
+            <button type="button" class="tab-btn" id="tabCamera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+              <span>Live Camera</span>
+            </button>
+          </div>
+
+          <!-- Upload Dropzone Area -->
+          <div id="uploadArea">
+            <div class="dropzone" id="dropzone">
+              <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" style="display: none;">
+              <div class="dropzone-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+              </div>
+              <div class="dropzone-title">Drag &amp; drop your meal image here</div>
+              <div class="dropzone-sub">or click to browse from your computer / phone</div>
+              <button type="button" class="btn-outline" id="browseBtn" style="padding: 0.45rem 1.25rem; font-size: 0.85rem; margin-top: 0.25rem;">
+                Browse File
+              </button>
+              <div class="format-tags">
+                <span class="format-tag">JPG</span>
+                <span class="format-tag">PNG</span>
+                <span class="format-tag">WebP</span>
+                <span class="format-tag">Max 15MB</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Camera Container -->
+          <div class="camera-container" id="cameraContainer">
+            <div class="camera-viewfinder">
+              <video id="cameraFeed" autoplay playsinline></video>
+              <canvas id="cameraCanvas" style="display: none;"></canvas>
+              <div class="camera-grid-overlay"></div>
+              <div class="camera-live-badge">
+                <span class="camera-live-dot"></span>
+                <span>LIVE FEED</span>
+              </div>
+            </div>
+
+            <div class="camera-controls">
+              <button type="button" class="btn-primary" id="startCameraBtn" style="display: none;">
+                Start Camera
+              </button>
+              <button type="button" class="btn-primary" id="capturePhotoBtn">
+                📸 Capture Photo
+              </button>
+              <button type="button" class="btn-outline" id="retakePhotoBtn" style="display: none;">
+                🔄 Retake
+              </button>
+              <button type="button" class="btn-outline" id="switchCameraBtn">
+                🔄 Flip Camera
+              </button>
+              <button type="button" class="btn-sm-action btn-sm-danger" id="stopCameraBtn">
+                Stop
+              </button>
+            </div>
+          </div>
+
+          <!-- Image Preview Container -->
+          <div class="preview-container" id="previewContainer">
+            <div class="preview-box">
+              <img id="previewImg" class="preview-img" alt="Selected meal preview">
+            </div>
+            <div class="preview-actions">
+              <span class="preview-meta" id="previewMetaText">image.jpg</span>
+              <div style="display: flex; gap: 0.5rem;">
+                <button type="button" class="btn-sm-action" id="replaceImgBtn">Replace</button>
+                <button type="button" class="btn-sm-action btn-sm-danger" id="removeImgBtn">Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Analyze CTA Button -->
+          <button type="button" class="btn-analyze" id="analyzeBtn" disabled>
+            <span class="spinner" id="analyzeSpinner" style="display: none;"></span>
+            <span id="analyzeBtnText">Analyze Food with AI</span>
+          </button>
+        </div>
+
+        <!-- Column 2: AI Detection & Portion Customizer -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+              <span>2. Identification &amp; Portions</span>
+            </h2>
+            <span class="brand-ai-badge">USDA Verified</span>
+          </div>
+
+          <!-- AI Detection Results Card -->
+          <div class="ai-results-card" id="aiResultsCard" style="display: none;">
+            <div class="detected-food-banner">
+              <span class="detected-label">AI Detected Food</span>
+              <div class="detected-title-row">
+                <span class="detected-food-name" id="detectedFoodName">Grilled Salmon</span>
+                <span class="confidence-chip" id="detectedConfidence">94% Confidence</span>
+              </div>
+            </div>
+
+            <!-- Candidate suggestions -->
+            <div class="candidates-wrap">
+              <span class="candidates-label">Alternative Candidate Matches (Click to switch):</span>
+              <div class="candidate-pills" id="candidatePills">
+                <!-- Injected via JavaScript -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Manual Food Correction & Search Bar -->
+          <div class="search-correction-box">
+            <div class="correction-title">
+              <span>Correct Food Name or Search USDA Database</span>
+              <small style="color: var(--text-muted); font-weight: normal;">Live Autocomplete</small>
+            </div>
+            <div class="autocomplete-dropdown">
+              <div class="correction-input-group">
+                <input type="text"
+                       id="foodSearchInput"
+                       class="correction-input"
+                       placeholder="e.g. Chicken drumstick, Salmon, Steak, Brown rice..."
+                       autocomplete="off">
+                <button type="button" class="btn-correction-search" id="foodSearchBtn">
+                  Search
+                </button>
+              </div>
+              <ul class="autocomplete-list" id="autocompleteList">
+                <!-- Autocomplete suggestions populated dynamically -->
+              </ul>
+            </div>
+
+            <!-- Quick Popular Food Suggestions -->
+            <div style="margin-top: 0.5rem;">
+              <small style="color: var(--text-muted); font-size: 0.75rem; font-weight: 600;">Quick Suggestions:</small>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.35rem;">
+                <button type="button" class="preset-chip quick-food-chip" data-search="Chicken drumstick">🍗 Chicken Drumstick</button>
+                <button type="button" class="preset-chip quick-food-chip" data-search="Grilled chicken breast">🥩 Chicken Breast</button>
+                <button type="button" class="preset-chip quick-food-chip" data-search="Salmon fillet">🐟 Salmon</button>
+                <button type="button" class="preset-chip quick-food-chip" data-search="Steak">🥩 Steak</button>
+                <button type="button" class="preset-chip quick-food-chip" data-search="Avocado">🥑 Avocado</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Portion Sizing Controls -->
+          <div class="portion-section" id="portionSection">
+            <div class="portion-header">
+              <span class="portion-title">Portion Quantity (Grams)</span>
+              <span class="portion-formula-pill">Calculated = nutrient/100g × grams / 100</span>
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="preset-chips">
+              <button type="button" class="preset-chip" data-grams="50">50g</button>
+              <button type="button" class="preset-chip" data-grams="100">100g</button>
+              <button type="button" class="preset-chip active" data-grams="150">150g</button>
+              <button type="button" class="preset-chip" data-grams="200">200g</button>
+              <button type="button" class="preset-chip" data-grams="250">250g</button>
+              <button type="button" class="preset-chip" data-grams="350">350g</button>
+              <button type="button" class="preset-chip" data-grams="500">500g</button>
+            </div>
+
+            <!-- Slider and Exact Gram Number Input -->
+            <div class="slider-group">
+              <input type="range"
+                     id="gramSlider"
+                     class="gram-slider"
+                     min="10"
+                     max="1000"
+                     step="5"
+                     value="150">
+              <div class="gram-number-box">
+                <input type="number"
+                       id="gramInput"
+                       class="gram-input"
+                       min="1"
+                       max="5000"
+                       value="150">
+                <span class="gram-unit">g</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           Full-Width Nutrition Dashboard (Appears when food is analyzed/selected)
+           ========================================================================== -->
+      <section class="dashboard-container" id="dashboardContainer" style="display: none;">
+
+        <div class="workspace-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 0;">
+          <div>
+            <h2 class="workspace-title" style="font-size: 1.65rem;">Nutritional Breakdown</h2>
+            <p class="workspace-subtitle">Values calculated per selected portion weight in grams.</p>
+          </div>
+          <span class="source-badge" id="dataSourceLabel">USDA FoodData Central</span>
+        </div>
+
+        <!-- 7 Core Metric Cards -->
+        <div class="metric-cards-grid">
+          <!-- 1. Calories -->
+          <div class="metric-card card-calories">
+            <div class="metric-header">
+              <span class="metric-name">Calories</span>
+              <span style="font-size: 0.9rem;">🔥</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricCalories">0</span>
+              <span class="metric-unit">kcal</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-calories" id="dvCaloriesFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Daily Value</span>
+              <span id="dvCaloriesText">0% DV</span>
+            </div>
+          </div>
+
+          <!-- 2. Protein -->
+          <div class="metric-card card-protein">
+            <div class="metric-header">
+              <span class="metric-name">Protein</span>
+              <span style="font-size: 0.9rem;">🥩</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricProtein">0</span>
+              <span class="metric-unit">g</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-protein" id="dvProteinFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Target 50g</span>
+              <span id="dvProteinText">0% DV</span>
+            </div>
+          </div>
+
+          <!-- 3. Carbohydrates -->
+          <div class="metric-card card-carbs">
+            <div class="metric-header">
+              <span class="metric-name">Carbs</span>
+              <span style="font-size: 0.9rem;">🌾</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricCarbs">0</span>
+              <span class="metric-unit">g</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-carbs" id="dvCarbsFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Target 275g</span>
+              <span id="dvCarbsText">0% DV</span>
+            </div>
+          </div>
+
+          <!-- 4. Total Fat -->
+          <div class="metric-card card-fat">
+            <div class="metric-header">
+              <span class="metric-name">Total Fat</span>
+              <span style="font-size: 0.9rem;">🥑</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricFat">0</span>
+              <span class="metric-unit">g</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-fat" id="dvFatFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Limit 78g</span>
+              <span id="dvFatText">0% DV</span>
+            </div>
+          </div>
+
+          <!-- 5. Dietary Fiber -->
+          <div class="metric-card card-fiber">
+            <div class="metric-header">
+              <span class="metric-name">Fiber</span>
+              <span style="font-size: 0.9rem;">🥦</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricFiber">0</span>
+              <span class="metric-unit">g</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-fiber" id="dvFiberFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Target 28g</span>
+              <span id="dvFiberText">0% DV</span>
+            </div>
+          </div>
+
+          <!-- 6. Total Sugars -->
+          <div class="metric-card card-sugar">
+            <div class="metric-header">
+              <span class="metric-name">Sugars</span>
+              <span style="font-size: 0.9rem;">🍯</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricSugar">0</span>
+              <span class="metric-unit">g</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-sugar" id="dvSugarFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Limit 50g</span>
+              <span id="dvSugarText">0% DV</span>
+            </div>
+          </div>
+
+          <!-- 7. Sodium -->
+          <div class="metric-card card-sodium">
+            <div class="metric-header">
+              <span class="metric-name">Sodium</span>
+              <span style="font-size: 0.9rem;">🧂</span>
+            </div>
+            <div class="metric-value-wrap">
+              <span class="metric-number" id="metricSodium">0</span>
+              <span class="metric-unit">mg</span>
+            </div>
+            <div class="metric-dv-bar">
+              <div class="metric-dv-fill fill-sodium" id="dvSodiumFill" style="width: 0%;"></div>
+            </div>
+            <div class="metric-dv-text">
+              <span>Limit 2300mg</span>
+              <span id="dvSodiumText">0% DV</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Section (Chart.js) -->
+        <div class="charts-grid">
+          <!-- Chart 1: Macro Calorie Distribution -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Macronutrient Calorie Distribution</h3>
+                <span class="chart-subtitle">Energy contributions (% kcal)</span>
+              </div>
+            </div>
+            <div class="chart-container-box">
+              <canvas id="macroDoughnutChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Chart 2: Micronutrient & Mineral Daily Values -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div>
+                <h3 class="chart-title">Micronutrient &amp; Mineral Profile</h3>
+                <span class="chart-subtitle">% Daily Value based on 2,000 kcal diet</span>
+              </div>
+            </div>
+            <div class="chart-container-box">
+              <canvas id="microBarChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- FDA Label & Data Notice Section -->
+        <div class="details-grid">
+          <!-- FDA Nutrition Facts Label -->
+          <div class="fda-facts-card">
+            <div class="fda-title">Nutrition Facts</div>
+            <div class="fda-serving-info">
+              <span id="fdaFoodName">Food Item</span>
+              <span>Serving: <strong id="fdaServingGrams">150g</strong></span>
+            </div>
+            <div class="fda-calories-row">
+              <div>
+                <div class="fda-calories-label">Calories</div>
+                <small style="color: #666; font-size: 0.72rem;">per serving</small>
+              </div>
+              <div class="fda-calories-val" id="fdaCalories">0</div>
+            </div>
+            <div class="fda-dv-header">% Daily Value *</div>
+
+            <div class="fda-row bold-row">
+              <span>Total Fat <span id="fdaFatVal">0g</span></span>
+              <strong id="fdaFatDv">0%</strong>
+            </div>
+
+            <div class="fda-row bold-row">
+              <span>Sodium <span id="fdaSodiumVal">0mg</span></span>
+              <strong id="fdaSodiumDv">0%</strong>
+            </div>
+
+            <div class="fda-row bold-row">
+              <span>Total Carbohydrate <span id="fdaCarbVal">0g</span></span>
+              <strong id="fdaCarbDv">0%</strong>
+            </div>
+
+            <div class="fda-row sub-row">
+              <span>Dietary Fiber <span id="fdaFiberVal">0g</span></span>
+              <strong id="fdaFiberDv">0%</strong>
+            </div>
+
+            <div class="fda-row sub-row">
+              <span>Total Sugars <span id="fdaSugarVal">0g</span></span>
+              <span>—</span>
+            </div>
+
+            <div class="fda-row bold-row">
+              <span>Protein <span id="fdaProteinVal">0g</span></span>
+              <strong id="fdaProteinDv">0%</strong>
+            </div>
+
+            <div class="fda-footer-note">
+              * The % Daily Value (DV) tells you how much a nutrient in a serving of food contributes to a daily diet of 2,000 calories a day used for general nutrition advice.
+            </div>
+          </div>
+
+          <!-- Data Quality & Missing Nutrients Notice -->
+          <div class="data-notice-card">
+            <div class="panel-header">
+              <h3 class="panel-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Data Completeness &amp; Reference</span>
+              </h3>
+            </div>
+
+            <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55;">
+              NutriVision AI computes nutritional values using standard USDA FoodData Central laboratory entries. When specific micronutrients are unmeasured by USDA analytical tests for branded or legacy entries, they are explicitly tagged below to guarantee analytical honesty.
+            </p>
+
+            <div id="missingNutrientsBox" class="missing-data-box" style="display: none;">
+              <strong>Notice on Missing Nutrient Data:</strong>
+              <div class="missing-pills" id="missingNutrientPills"></div>
+            </div>
+
+            <div class="arch-box" style="margin-top: auto;">
+              <span class="arch-box-role">Scaling Equation</span>
+              <div style="font-family: monospace; font-size: 0.85rem; color: var(--primary-dark); font-weight: 700;">
+                Calculated nutrient = nutrient per 100g × quantity (g) / 100
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard Action Buttons -->
+        <div class="dashboard-actions-row">
+          <button type="button" class="btn-primary" id="logMealBtn">
+            <span>+ Log to Daily Meal Diary</span>
+          </button>
+
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-outline" id="exportJsonBtn">
+              📥 Export JSON Report
+            </button>
+            <button type="button" class="btn-outline" id="printReportBtn">
+              🖨️ Print Nutrition Facts
+            </button>
+          </div>
+        </div>
+
+        <!-- Daily Meal Diary Section -->
+        <div class="diary-card" id="diaryCard">
+          <div class="diary-header">
+            <div>
+              <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Today's Daily Meal Diary</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">Saved in local browser memory</p>
+            </div>
+            <button type="button" class="btn-sm-action btn-sm-danger" id="clearDiaryBtn">
+              Clear Diary
+            </button>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table class="diary-table">
+              <thead>
+                <tr>
+                  <th>Food Item</th>
+                  <th>Quantity</th>
+                  <th>Calories</th>
+                  <th>Protein</th>
+                  <th>Carbohydrates</th>
+                  <th>Fat</th>
+                </tr>
+              </thead>
+              <tbody id="diaryTableBody">
+                <!-- Logged meals injected here -->
+              </tbody>
+              <tfoot>
+                <tr class="diary-totals-row" id="diaryTotalsRow" style="display: none;">
+                  <td>Daily Total</td>
+                  <td>—</td>
+                  <td id="diaryTotalCalories">0 kcal</td>
+                  <td id="diaryTotalProtein">0g</td>
+                  <td id="diaryTotalCarbs">0g</td>
+                  <td id="diaryTotalFat">0g</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ==========================================================================
+       Footer
+       ========================================================================== -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="disclaimer-note">
+        <strong>⚠️ Medical &amp; Dietary Disclaimer:</strong> All nutritional figures and AI identifications provided by NutriVision AI are estimates derived from USDA FoodData Central reference values and computer vision models. They are intended for informational, wellness, and educational purposes only. Always consult a qualified registered dietitian or physician for specific medical nutrition therapy.
+      </div>
+      <div class="footer-bottom">
+        <div>&copy; 2026 NutriVision AI. All rights reserved.</div>
+        <div>Connected to USDA FoodData Central &amp; Vercel Serverless API</div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       Backend Settings Modal
+       ========================================================================== -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Backend Connection Settings</h3>
+        <button type="button" class="modal-close-btn" id="closeModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="form-help">
+          NutriVision AI runs on Vercel Serverless Functions out of the box. You can also connect to an external REST API by specifying the HTTPS backend URL below.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="backendUrlInput">API Base URL</label>
+          <input type="url" id="backendUrlInput" class="form-input" placeholder="http://localhost:8888">
+          <span class="form-help">Current active origin: <code>http://localhost:8888</code> (or Vercel domain in production).</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="aiApiKeyInput">Google Gemini API Key (Optional)</label>
+          <input type="password" id="aiApiKeyInput" class="form-input" placeholder="AIzaSy...">
+          <span class="form-help">Optional: enter a Gemini Vision API key to enable live multimodal image recognition on meal uploads.</span>
+        </div>
+
+        <div class="disclaimer-note" style="margin-bottom: 0;">
+          🔒 <strong>Security Note:</strong> In production on Vercel, private AI Vision and USDA API keys are stored securely in Vercel Environment Variables.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-sm-action" id="resetBackendUrlBtn">Reset to Default</button>
+        <button type="button" class="btn-primary" id="saveBackendUrlBtn" style="padding: 0.5rem 1.25rem; font-size: 0.88rem;">Save &amp; Test</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/config.js"></script>
+  <script src="/js/camera.js"></script>
+  <script src="/js/nutrition.js"></script>
+  <script src="/js/dashboard.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

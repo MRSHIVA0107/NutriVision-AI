@@ -147,53 +147,29 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
-// Known static routes map for instant zero-latency serving
-const STATIC_ROUTES = {
-  '/': { file: 'index.html', type: 'text/html; charset=UTF-8' },
-  '/index': { file: 'index.html', type: 'text/html; charset=UTF-8' },
-  '/index.html': { file: 'index.html', type: 'text/html; charset=UTF-8' },
-  '/analyze': { file: 'analyze.html', type: 'text/html; charset=UTF-8' },
-  '/analyze.html': { file: 'analyze.html', type: 'text/html; charset=UTF-8' },
-  '/css/style.css': { file: path.join('css', 'style.css'), type: 'text/css; charset=UTF-8' },
-  '/css/dashboard.css': { file: path.join('css', 'dashboard.css'), type: 'text/css; charset=UTF-8' },
-  '/js/config.js': { file: path.join('js', 'config.js'), type: 'application/javascript; charset=UTF-8' },
-  '/js/camera.js': { file: path.join('js', 'camera.js'), type: 'application/javascript; charset=UTF-8' },
-  '/js/nutrition.js': { file: path.join('js', 'nutrition.js'), type: 'application/javascript; charset=UTF-8' },
-  '/js/dashboard.js': { file: path.join('js', 'dashboard.js'), type: 'application/javascript; charset=UTF-8' },
-  '/js/app.js': { file: path.join('js', 'app.js'), type: 'application/javascript; charset=UTF-8' }
-};
+// Pre-bundled in-memory assets for 100% reliable Vercel Serverless Function serving
+let ASSETS_BUNDLE = {};
+try {
+  ASSETS_BUNDLE = require('./assets-bundle.js');
+} catch (e) {
+  console.warn('⚠️ assets-bundle.js not loaded, will use fallback disk reader:', e.message);
+}
 
-// In-memory static file cache for high-concurrency Vercel serverless execution
-const fileCache = new Map();
-
-function getStaticFile(pathname) {
-  const normalized = pathname.toLowerCase();
-  const route = STATIC_ROUTES[normalized];
-  const relativeFile = route ? route.file : pathname.replace(/^\/+/, '');
-  const contentType = (route && route.type) || MIME_TYPES[path.extname(relativeFile).toLowerCase()] || 'application/octet-stream';
-
-  if (fileCache.has(normalized)) {
-    return { data: fileCache.get(normalized), contentType };
-  }
-
-  // Search across possible Vercel / serverless runtime paths
-  const candidatePaths = [
-    path.join(__dirname, relativeFile),
-    path.join(process.cwd(), relativeFile),
-    path.join(__dirname, 'frontend', relativeFile),
-    path.join(process.cwd(), 'frontend', relativeFile)
+// Fallback disk asset loader with multi-path resolution
+function safeRead(relPath) {
+  const candidates = [
+    path.join(__dirname, relPath),
+    path.join(__dirname, 'public', relPath),
+    path.join(process.cwd(), relPath),
+    path.join(process.cwd(), 'public', relPath)
   ];
-
-  for (const p of candidatePaths) {
+  for (const c of candidates) {
     try {
-      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
-        const data = fs.readFileSync(p);
-        fileCache.set(normalized, data);
-        return { data, contentType };
+      if (fs.existsSync(c)) {
+        return fs.readFileSync(c);
       }
     } catch (_) {}
   }
-
   return null;
 }
 
@@ -211,7 +187,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Modern WHATWG URL parsing (replaces deprecated url.parse)
+  // Modern WHATWG URL parsing
   const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const pathname = reqUrl.pathname;
 
@@ -496,15 +472,39 @@ const server = http.createServer(async (req, res) => {
   }
 
   // =========================================================================
-  // STATIC ASSETS (HTML, CSS, JS, Images)
+  // FAVICON HANDLER
   // =========================================================================
-  const staticMatch = getStaticFile(pathname);
-  if (staticMatch) {
+  if (pathname === '/favicon.ico') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // =========================================================================
+  // STATIC ASSETS (100% In-memory serving for HTML, CSS, JS on Vercel)
+  // =========================================================================
+  const normPath = pathname.toLowerCase();
+  const bundleMatch = ASSETS_BUNDLE[normPath] || ASSETS_BUNDLE[normPath.replace(/\/$/, '')];
+  if (bundleMatch && bundleMatch.data) {
     res.writeHead(200, {
-      'Content-Type': staticMatch.contentType,
+      'Content-Type': bundleMatch.contentType,
+      'Content-Length': bundleMatch.data.length,
       'Cache-Control': 'public, max-age=3600'
     });
-    res.end(staticMatch.data);
+    res.end(bundleMatch.data);
+    return;
+  }
+
+  // Fallback disk lookup
+  const diskData = safeRead(pathname.replace(/^\/+/, ''));
+  if (diskData && diskData.length > 0) {
+    const ext = path.extname(pathname).toLowerCase();
+    res.writeHead(200, {
+      'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+      'Content-Length': diskData.length,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    res.end(diskData);
     return;
   }
 
@@ -669,7 +669,7 @@ function analyzeFoodImage(buffer, fileName = '') {
 module.exports = server;
 
 // Local development server listener
-if (!process.env.VERCEL) {
+if (!process.env.VERCEL && require.main === module) {
   server.listen(PORT, '127.0.0.1', () => {
     console.log(`⚡ NutriVision Server active at http://localhost:${PORT}`);
   });

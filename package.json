@@ -4,6 +4,7 @@
   "description": "Intelligent Food Recognition & Precision Nutrition Analysis Platform",
   "main": "server.js",
   "scripts": {
+    "build": "node scripts/build-bundle.js",
     "start": "node server.js",
     "dev": "node server.js"
   },
