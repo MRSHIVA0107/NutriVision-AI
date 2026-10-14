@@ -59,7 +59,7 @@ nutrivision-ai/
 ├── vercel.json                   # Vercel deployment config & security headers
 ├── .vercelignore                 # Excludes logs and IDE files from Vercel deployments
 ├── package.json                  # Scripts (npm start, npm run dev) and metadata
-├── scripts/dev-server.js         # Standalone Node.js server (local testing / dev)
+├── server.js                     # Standalone Node.js server (local testing / dev)
 ├── .gitignore                    # Git exclusions
 └── README.md                     # Documentation
 ```

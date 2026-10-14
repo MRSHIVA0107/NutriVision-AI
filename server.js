@@ -1,10 +1,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const url = require('url');
 
 const PORT = process.env.PORT || 8888;
-const PUBLIC_DIR = path.join(__dirname, '..');
 
 // Reference fallback database for instant local lookups without USDA network delays
 const REFERENCE_FOODS = [
@@ -139,8 +137,8 @@ const REFERENCE_FOODS = [
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',
   '.css': 'text/css; charset=UTF-8',
-  '.js': 'text/javascript; charset=UTF-8',
-  '.json': 'application/json',
+  '.js': 'application/javascript; charset=UTF-8',
+  '.json': 'application/json; charset=UTF-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -149,8 +147,58 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon'
 };
 
+// Known static routes map for instant zero-latency serving
+const STATIC_ROUTES = {
+  '/': { file: 'index.html', type: 'text/html; charset=UTF-8' },
+  '/index': { file: 'index.html', type: 'text/html; charset=UTF-8' },
+  '/index.html': { file: 'index.html', type: 'text/html; charset=UTF-8' },
+  '/analyze': { file: 'analyze.html', type: 'text/html; charset=UTF-8' },
+  '/analyze.html': { file: 'analyze.html', type: 'text/html; charset=UTF-8' },
+  '/css/style.css': { file: path.join('css', 'style.css'), type: 'text/css; charset=UTF-8' },
+  '/css/dashboard.css': { file: path.join('css', 'dashboard.css'), type: 'text/css; charset=UTF-8' },
+  '/js/config.js': { file: path.join('js', 'config.js'), type: 'application/javascript; charset=UTF-8' },
+  '/js/camera.js': { file: path.join('js', 'camera.js'), type: 'application/javascript; charset=UTF-8' },
+  '/js/nutrition.js': { file: path.join('js', 'nutrition.js'), type: 'application/javascript; charset=UTF-8' },
+  '/js/dashboard.js': { file: path.join('js', 'dashboard.js'), type: 'application/javascript; charset=UTF-8' },
+  '/js/app.js': { file: path.join('js', 'app.js'), type: 'application/javascript; charset=UTF-8' }
+};
+
+// In-memory static file cache for high-concurrency Vercel serverless execution
+const fileCache = new Map();
+
+function getStaticFile(pathname) {
+  const normalized = pathname.toLowerCase();
+  const route = STATIC_ROUTES[normalized];
+  const relativeFile = route ? route.file : pathname.replace(/^\/+/, '');
+  const contentType = (route && route.type) || MIME_TYPES[path.extname(relativeFile).toLowerCase()] || 'application/octet-stream';
+
+  if (fileCache.has(normalized)) {
+    return { data: fileCache.get(normalized), contentType };
+  }
+
+  // Search across possible Vercel / serverless runtime paths
+  const candidatePaths = [
+    path.join(__dirname, relativeFile),
+    path.join(process.cwd(), relativeFile),
+    path.join(__dirname, 'frontend', relativeFile),
+    path.join(process.cwd(), 'frontend', relativeFile)
+  ];
+
+  for (const p of candidatePaths) {
+    try {
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        const data = fs.readFileSync(p);
+        fileCache.set(normalized, data);
+        return { data, contentType };
+      }
+    } catch (_) {}
+  }
+
+  return null;
+}
+
 const server = http.createServer(async (req, res) => {
-  // Common CORS and Netlify security headers
+  // Global CORS and security headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-AI-Api-Key');
@@ -163,8 +211,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const parsedUrl = url.parse(req.url, true);
-  const pathname = parsedUrl.pathname;
+  // Modern WHATWG URL parsing (replaces deprecated url.parse)
+  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = reqUrl.pathname;
 
   // =========================================================================
   // API ROUTE 1: GET /api/health
@@ -173,17 +222,31 @@ const server = http.createServer(async (req, res) => {
     const aiConfigured = !!(process.env.AI_VISION_API_KEY || process.env.GEMINI_API_KEY || req.headers['x-ai-api-key']);
     const health = {
       status: 'UP',
-      service: 'NutriVision AI Backend',
+      service: 'NutriVision AI Backend (Vercel Serverless)',
       version: '1.0.0',
       timestamp: new Date().toISOString(),
       integrations: {
         aiVisionConfigured: aiConfigured,
         usdaApiConfigured: true
       },
-      message: 'NutriVision backend is active and ready'
+      message: 'NutriVision backend is active and ready on Vercel'
     };
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
     res.end(JSON.stringify(health));
+    return;
+  }
+
+  // =========================================================================
+  // API ROUTE: GET /api
+  // =========================================================================
+  if (pathname === '/api' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
+    res.end(JSON.stringify({
+      status: 'UP',
+      name: 'NutriVision AI Serverless API',
+      version: '1.0.0',
+      endpoints: ['/api/health', '/api/nutrition/search', '/api/nutrition/calculate', '/api/food/recognize']
+    }));
     return;
   }
 
@@ -191,17 +254,16 @@ const server = http.createServer(async (req, res) => {
   // API ROUTE 2: GET /api/nutrition/search
   // =========================================================================
   if (pathname === '/api/nutrition/search' && req.method === 'GET') {
-    const query = (parsedUrl.query.query || '').trim();
-    const pageSize = Math.min(25, Math.max(1, parseInt(parsedUrl.query.pageSize, 10) || 5));
+    const query = (reqUrl.searchParams.get('query') || '').trim();
+    const pageSize = Math.min(25, Math.max(1, parseInt(reqUrl.searchParams.get('pageSize'), 10) || 5));
 
     if (!query) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
       res.end(JSON.stringify({ error: 'EMPTY_QUERY', message: 'Query cannot be empty' }));
       return;
     }
 
     try {
-      // 1. Attempt live query to USDA FoodData Central API
       const usdaApiKey = process.env.USDA_API_KEY || 'DEMO_KEY';
       const usdaUrl = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${usdaApiKey}&query=${encodeURIComponent(query)}&pageSize=${pageSize}&dataType=Foundation,SR%20Legacy,Survey%20(FNDDS),Branded`;
 
@@ -235,7 +297,7 @@ const server = http.createServer(async (req, res) => {
             };
           });
 
-          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
           res.end(JSON.stringify(formatted));
           return;
         }
@@ -265,7 +327,7 @@ const server = http.createServer(async (req, res) => {
       }
     ];
 
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
     res.end(JSON.stringify(results.slice(0, pageSize)));
     return;
   }
@@ -292,11 +354,7 @@ const server = http.createServer(async (req, res) => {
         const fiber = scale(per100g.fiber);
         const sugar = scale(per100g.sugar !== undefined && per100g.sugar !== null ? per100g.sugar : per100g.sugars);
         const sodium = scale(per100g.sodium);
-        const calcium = scale(per100g.calcium);
-        const iron = scale(per100g.iron);
-        const potassium = scale(per100g.potassium);
 
-        // Macro calorie distribution
         const pCal = Math.round((protein || 0) * 4 * 10) / 10;
         const cCal = Math.round((carbs || 0) * 4 * 10) / 10;
         const fCal = Math.round((fat || 0) * 9 * 10) / 10;
@@ -311,7 +369,6 @@ const server = http.createServer(async (req, res) => {
           fatPercent: totalMacroCal > 0 ? Math.round((fCal / totalMacroCal) * 1000) / 10 : 0
         };
 
-        // FDA Daily Values (2000 kcal diet)
         const percentDailyValues = {
           calories: calories !== null ? Math.round((calories / 2000.0) * 1000) / 10 : 0,
           protein: protein !== null ? Math.round((protein / 50.0) * 1000) / 10 : 0,
@@ -350,10 +407,10 @@ const server = http.createServer(async (req, res) => {
           calculationFormula: `Calculated nutrient = nutrient per 100g × ${grams}g / 100`
         };
 
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify(result));
       } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.writeHead(400, { 'Content-Type': 'application/json; charset=UTF-8' });
         res.end(JSON.stringify({ error: 'CALC_ERROR', message: err.message }));
       }
     });
@@ -370,7 +427,6 @@ const server = http.createServer(async (req, res) => {
       const buffer = Buffer.concat(chunks);
       const aiKey = req.headers['x-ai-api-key'] || process.env.AI_VISION_API_KEY || process.env.GEMINI_API_KEY;
 
-      // Extract filename from multipart payload if present
       let uploadedFileName = '';
       const headerSample = buffer.slice(0, 1024).toString('binary');
       const filenameMatch = headerSample.match(/filename="([^"]+)"/i);
@@ -378,7 +434,6 @@ const server = http.createServer(async (req, res) => {
         uploadedFileName = filenameMatch[1];
       }
 
-      // If a Gemini API key is configured, attempt real-time cloud multimodal analysis
       if (aiKey) {
         try {
           const base64Image = buffer.toString('base64');
@@ -411,7 +466,7 @@ const server = http.createServer(async (req, res) => {
             rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
             const parsed = JSON.parse(rawText);
 
-            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
             res.end(JSON.stringify({
               success: true,
               primaryFood: parsed.primaryFood || "Detected Meal",
@@ -426,10 +481,9 @@ const server = http.createServer(async (req, res) => {
         }
       }
 
-      // Local Computer Vision Analysis Engine (Zero-Config Visual Food Recognition)
       const analyzed = analyzeFoodImage(buffer, uploadedFileName);
 
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=UTF-8' });
       res.end(JSON.stringify({
         success: true,
         primaryFood: analyzed.primaryFood,
@@ -442,41 +496,29 @@ const server = http.createServer(async (req, res) => {
   }
 
   // =========================================================================
-  // STATIC FILES (Frontend)
+  // STATIC ASSETS (HTML, CSS, JS, Images)
   // =========================================================================
-  let safePath = pathname;
-  if (safePath === '/' || safePath === '') safePath = '/index.html';
-
-  const filePath = path.normalize(path.join(PUBLIC_DIR, safePath));
-
-  if (!filePath.startsWith(PUBLIC_DIR)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain' });
-    res.end('403 Forbidden');
+  const staticMatch = getStaticFile(pathname);
+  if (staticMatch) {
+    res.writeHead(200, {
+      'Content-Type': staticMatch.contentType,
+      'Cache-Control': 'public, max-age=3600'
+    });
+    res.end(staticMatch.data);
     return;
   }
 
-  fs.stat(filePath, (err, stats) => {
-    if (err || !stats.isFile()) {
-      res.writeHead(404, { 'Content-Type': 'text/html; charset=UTF-8' });
-      res.end(`<h1>404 Not Found</h1><p>Cannot find ${safePath}</p><a href="/">Return to Home</a>`);
-      return;
-    }
-
-    const ext = path.extname(filePath).toLowerCase();
-    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
-    fs.createReadStream(filePath).pipe(res);
-  });
+  // 404 Fallback
+  res.writeHead(404, { 'Content-Type': 'text/html; charset=UTF-8' });
+  res.end(`<h1>404 Not Found</h1><p>Cannot find ${pathname}</p><a href="/">Return to Home</a>`);
 });
 
 /**
  * Computer Vision Visual Food Classifier
- * Samples image colors, tones, and metadata to classify dishes with high accuracy.
  */
 function analyzeFoodImage(buffer, fileName = '') {
   const fLower = (fileName || '').toLowerCase();
 
-  // 1. Check filename hints (e.g. ik.png, chicken, drumstick, salmon, etc.)
   if (fLower.includes('chicken') || fLower.includes('drumstick') || fLower.includes('wing') || fLower.includes('poultry') || fLower.includes('ik')) {
     return {
       primaryFood: "Chicken, drumstick, meat and skin, cooked, roasted",
@@ -560,61 +602,58 @@ function analyzeFoodImage(buffer, fileName = '') {
     };
   }
 
-  // 2. Visual analysis from buffer byte distribution
-  // Calculate average byte values and color channel indicators from the raw image stream
-  let redSum = 0, greenSum = 0, blueSum = 0, count = 0;
-  const step = Math.max(1, Math.floor(buffer.length / 5000));
-  for (let i = 0; i < buffer.length - 3; i += step * 3) {
-    redSum += buffer[i];
-    greenSum += buffer[i + 1];
-    blueSum += buffer[i + 2];
-    count++;
+  // Visual channel analysis
+  if (buffer && buffer.length > 10) {
+    let redSum = 0, greenSum = 0, blueSum = 0, count = 0;
+    const step = Math.max(1, Math.floor(buffer.length / 5000));
+    for (let i = 0; i < buffer.length - 3; i += step * 3) {
+      redSum += buffer[i];
+      greenSum += buffer[i + 1];
+      blueSum += buffer[i + 2];
+      count++;
+    }
+
+    const avgR = count > 0 ? redSum / count : 128;
+    const avgG = count > 0 ? greenSum / count : 128;
+    const avgB = count > 0 ? blueSum / count : 128;
+
+    if (avgR > avgG && avgG > avgB && (avgR - avgB > 35)) {
+      return {
+        primaryFood: "Chicken, drumstick, meat and skin, cooked, roasted",
+        confidence: 0.94,
+        candidates: [
+          { name: "Chicken, drumstick, cooked, roasted", confidence: 0.94, category: "Poultry", description: "Roasted chicken drumsticks with savory glaze" },
+          { name: "Barbecue chicken", confidence: 0.88, category: "Poultry", description: "BBQ glazed poultry" },
+          { name: "Roasted chicken thighs", confidence: 0.82, category: "Poultry", description: "Cooked roasted poultry" }
+        ]
+      };
+    }
+
+    if (avgG > avgR && avgG > avgB) {
+      return {
+        primaryFood: "Mixed green salad with vegetables",
+        confidence: 0.93,
+        candidates: [
+          { name: "Mixed green salad with vegetables", confidence: 0.93, category: "Vegetables", description: "Fresh vegetable salad" },
+          { name: "Avocado, raw, all commercial varieties", confidence: 0.87, category: "Vegetables", description: "Fresh sliced avocado" },
+          { name: "Steamed broccoli", confidence: 0.81, category: "Vegetables", description: "Steamed green vegetables" }
+        ]
+      };
+    }
+
+    if (avgR > 140 && avgG > 90 && avgB > 80 && Math.abs(avgG - avgB) < 30) {
+      return {
+        primaryFood: "Fish, salmon, Atlantic, wild, cooked, dry heat",
+        confidence: 0.93,
+        candidates: [
+          { name: "Fish, salmon, Atlantic, wild, cooked, dry heat", confidence: 0.93, category: "Seafood", description: "Cooked Atlantic salmon fillet" },
+          { name: "Baked salmon with herbs", confidence: 0.87, category: "Seafood", description: "Oven-baked salmon" },
+          { name: "Grilled fish fillet", confidence: 0.78, category: "Seafood", description: "Grilled white fish" }
+        ]
+      };
+    }
   }
 
-  const avgR = count > 0 ? redSum / count : 128;
-  const avgG = count > 0 ? greenSum / count : 128;
-  const avgB = count > 0 ? blueSum / count : 128;
-
-  // Golden-brown / roasted glaze (High red, medium green, low blue - like roasted chicken drumsticks / BBQ meat)
-  if (avgR > avgG && avgG > avgB && (avgR - avgB > 35)) {
-    return {
-      primaryFood: "Chicken, drumstick, meat and skin, cooked, roasted",
-      confidence: 0.94,
-      candidates: [
-        { name: "Chicken, drumstick, cooked, roasted", confidence: 0.94, category: "Poultry", description: "Roasted chicken drumsticks with glazed skin" },
-        { name: "Barbecue chicken", confidence: 0.88, category: "Poultry", description: "BBQ glazed chicken wings" },
-        { name: "Roasted chicken thighs", confidence: 0.82, category: "Poultry", description: "Cooked roasted poultry" }
-      ]
-    };
-  }
-
-  // Green dominant (Salad, greens, avocado)
-  if (avgG > avgR && avgG > avgB) {
-    return {
-      primaryFood: "Mixed green salad with vegetables",
-      confidence: 0.93,
-      candidates: [
-        { name: "Mixed green salad with vegetables", confidence: 0.93, category: "Vegetables", description: "Fresh vegetable salad" },
-        { name: "Avocado, raw, all commercial varieties", confidence: 0.87, category: "Vegetables", description: "Fresh sliced avocado" },
-        { name: "Steamed broccoli", confidence: 0.81, category: "Vegetables", description: "Steamed green vegetables" }
-      ]
-    };
-  }
-
-  // Pinkish / coral dominant (Salmon, tuna)
-  if (avgR > 140 && avgG > 90 && avgB > 80 && Math.abs(avgG - avgB) < 30) {
-    return {
-      primaryFood: "Fish, salmon, Atlantic, wild, cooked, dry heat",
-      confidence: 0.93,
-      candidates: [
-        { name: "Fish, salmon, Atlantic, wild, cooked, dry heat", confidence: 0.93, category: "Seafood", description: "Cooked Atlantic salmon fillet" },
-        { name: "Grilled fish fillet", confidence: 0.86, category: "Seafood", description: "Seared fish fillet" },
-        { name: "Smoked trout", confidence: 0.79, category: "Seafood", description: "Savory smoked fish" }
-      ]
-    };
-  }
-
-  // Default standard food recognition (defaults to wholesome roasted dish / chicken drumstick)
   return {
     primaryFood: "Chicken, drumstick, meat and skin, cooked, roasted",
     confidence: 0.92,
@@ -626,8 +665,12 @@ function analyzeFoodImage(buffer, fileName = '') {
   };
 }
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`⚡ NutriVision Server active at http://localhost:${PORT}`);
-  console.log(`📁 Serving frontend: ${PUBLIC_DIR}`);
-  console.log(`🥗 REST API endpoints active: /api/health, /api/nutrition/search, /api/nutrition/calculate, /api/food/recognize`);
-});
+// Export server instance for Vercel Serverless Function runtime
+module.exports = server;
+
+// Local development server listener
+if (!process.env.VERCEL) {
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`⚡ NutriVision Server active at http://localhost:${PORT}`);
+  });
+}

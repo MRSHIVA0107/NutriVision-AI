@@ -1,5 +1,4 @@
 # Vercel Deployment Exclusions
-scripts/
 *.log
 .git
 .github
